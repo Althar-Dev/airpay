@@ -3,7 +3,7 @@
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { useDoc, useFirebase, useMemoFirebase, updateDocumentNonBlocking } from "@/firebase";
+import { useDoc, useFirebase, useMemoFirebase } from "@/firebase";
 import { doc } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -11,6 +11,7 @@ import { Save, Settings2, ShieldAlert, Sliders, Landmark, Smartphone, ArrowUpRig
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState, useEffect } from "react";
+import { updateSystemSettingsAction } from "@/app/admin/actions";
 
 export default function AdminSettingsPage() {
   const { firestore } = useFirebase();
@@ -46,28 +47,34 @@ export default function AdminSettingsPage() {
   const formatIDR = (amount: number) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount || 0);
 
-  const handleToggleMaintenance = (checked: boolean) => {
-    if (!settingsRef) return;
-    updateDocumentNonBlocking(settingsRef, { maintenanceMode: checked });
-    toast({
-      title: checked ? "Maintenance Mode Aktif ⚠️" : "Maintenance Mode Nonaktif 🟢",
-      description: checked ? "Akses publik seluruh merchant kini dibatasi." : "Akses publik seluruh merchant telah dipulihkan.",
-      variant: checked ? "destructive" : "default",
-    });
+  const handleToggleMaintenance = async (checked: boolean) => {
+    const resAction = await updateSystemSettingsAction({ maintenanceMode: checked });
+    if (resAction.success) {
+      toast({
+        title: checked ? "Maintenance Mode Aktif ⚠️" : "Maintenance Mode Nonaktif 🟢",
+        description: checked ? "Akses publik seluruh merchant kini dibatasi." : "Akses publik seluruh merchant telah dipulihkan.",
+        variant: checked ? "destructive" : "default",
+      });
+    } else {
+      toast({ variant: "destructive", title: "Gagal", description: resAction.message });
+    }
   };
 
-  const handleSavePlatformConfig = () => {
-    if (!settingsRef) return;
-    updateDocumentNonBlocking(settingsRef, {
+  const handleSavePlatformConfig = async () => {
+    const resAction = await updateSystemSettingsAction({
       minWithdrawal: Number(localSettings.minWithdrawal) || 10000,
       mdrFee: Number(localSettings.mdrFee) || 0.7,
       bankFee: Number(localSettings.bankFee) || 3500,
       ewalletFee: Number(localSettings.ewalletFee) || 2000,
     });
-    toast({
-      title: "Konfigurasi Tersimpan! ✨",
-      description: "Parameter platform & biaya penarikan AirPay telah diperbarui.",
-    });
+    if (resAction.success) {
+      toast({
+        title: "Konfigurasi Tersimpan! ✨",
+        description: "Parameter platform & biaya penarikan AirPay telah diperbarui.",
+      });
+    } else {
+      toast({ variant: "destructive", title: "Gagal", description: resAction.message });
+    }
   };
 
   return (

@@ -38,9 +38,10 @@ import {
   DialogHeader, 
   DialogTitle
 } from "@/components/ui/dialog";
-import { useDoc, useFirebase, useMemoFirebase, updateDocumentNonBlocking } from "@/firebase";
+import { useDoc, useFirebase, useMemoFirebase } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { goBizLogin, goBizVerify, goBizMutations } from "@/lib/payment/gopay";
+import { updateSystemSettingsAction, getSystemSettingsAction } from "@/app/admin/actions";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -65,6 +66,21 @@ export default function GopayConfigPage() {
     }
   }>(settingsRef);
 
+  const [serverSettings, setServerSettings] = useState<any>(null);
+
+  const loadServerSettings = useCallback(async () => {
+    const res = await getSystemSettingsAction();
+    if (res.success && res.data) {
+      setServerSettings(res.data);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadServerSettings();
+  }, [loadServerSettings]);
+
+  const activeSettings = settings || serverSettings;
+
   const [mutations, setMutations] = useState<any[] | null>(null);
   const [isFetchingMutations, setIsFetchingMutations] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -81,11 +97,11 @@ export default function GopayConfigPage() {
       enabled: true
   });
 
-  const isConnected = !!settings?.payments?.gopay?.accessToken;
+  const isConnected = !!activeSettings?.payments?.gopay?.accessToken;
 
   useEffect(() => {
-    if (settings?.payments?.gopay) {
-      const g = settings.payments.gopay;
+    if (activeSettings?.payments?.gopay) {
+      const g = activeSettings.payments.gopay;
       setForm(prev => ({
         ...prev,
         phoneNumber: g.phoneNumber || '',
@@ -93,13 +109,13 @@ export default function GopayConfigPage() {
         enabled: g.enabled ?? true
       }));
     }
-  }, [settings]);
+  }, [activeSettings]);
 
   const fetchMutations = useCallback(async () => {
-    if (!isConnected || !settings?.payments?.gopay) return;
+    if (!isConnected || !activeSettings?.payments?.gopay) return;
     
     setIsFetchingMutations(true);
-    const gopay = settings.payments.gopay;
+    const gopay = activeSettings.payments.gopay;
     
     try {
         const res = await goBizMutations({
@@ -114,8 +130,8 @@ export default function GopayConfigPage() {
         if (res.status === 'success' && res.data) {
             setMutations(res.data.mutations || []);
             
-            if (res.data.token_refreshed && res.data.access_token && settingsRef) {
-                updateDocumentNonBlocking(settingsRef, {
+            if (res.data.token_refreshed && res.data.access_token) {
+                updateSystemSettingsAction({
                     'payments.gopay.accessToken': res.data.access_token,
                     'payments.gopay.refreshToken': res.data.refresh_token || ''
                 });
@@ -181,18 +197,21 @@ export default function GopayConfigPage() {
                   qrisString: form.qrisString || ''
               };
               
-              if (settingsRef) {
-                  const updates: any = { 
-                      'payments.gopay': newData 
-                  };
-                  
-                  if (newData.enabled) {
-                      updates['payments.orderkuota.enabled'] = false;
-                      updates['payments.shopeepay.enabled'] = false;
-                  }
-
-                  await updateDocumentNonBlocking(settingsRef, updates);
+              const updates: any = { 
+                  'payments.gopay': newData 
+              };
+              
+              if (newData.enabled) {
+                  updates['payments.orderkuota.enabled'] = false;
+                  updates['payments.shopeepay.enabled'] = false;
               }
+
+              const resAction = await updateSystemSettingsAction(updates);
+              if (!resAction.success) {
+                  throw new Error(resAction.message || "Gagal menyimpan ke Firestore via Admin SDK.");
+              }
+
+              await loadServerSettings();
               
               setIsDialogOpen(false);
               setStep('settings');
@@ -209,7 +228,6 @@ export default function GopayConfigPage() {
   };
 
   const handleSaveSettings = async () => {
-    if (!settingsRef) return;
     setIsProcessing(true);
     try {
         const updates: any = {
@@ -222,27 +240,34 @@ export default function GopayConfigPage() {
             updates['payments.shopeepay.enabled'] = false;
         }
 
-        await updateDocumentNonBlocking(settingsRef, updates);
+        const resAction = await updateSystemSettingsAction(updates);
+        if (!resAction.success) {
+            throw new Error(resAction.message || "Gagal menyimpan pengaturan.");
+        }
+        await loadServerSettings();
         toast({ title: "Tersimpan ✨", description: "Pengaturan QRIS GoBiz telah diperbarui." });
         setIsDialogOpen(false);
-    } catch (error) {
-        toast({ variant: "destructive", title: "Gagal", description: "Gagal menyimpan pengaturan." });
+    } catch (error: any) {
+        toast({ variant: "destructive", title: "Gagal", description: error.message || "Gagal menyimpan pengaturan." });
     } finally {
         setIsProcessing(false);
     }
   };
 
   const handleDisconnect = async () => {
-    if (!settingsRef) return;
     setIsProcessing(true);
     try {
-        await updateDocumentNonBlocking(settingsRef, {
+        const resAction = await updateSystemSettingsAction({
             'payments.gopay': null
         });
+        if (!resAction.success) {
+            throw new Error(resAction.message || "Gagal memutuskan koneksi.");
+        }
+        await loadServerSettings();
         setMutations([]);
         toast({ title: "Terputus", description: "Koneksi akun Gopay Merchant telah dihapus." });
-    } catch (error) {
-        toast({ variant: "destructive", title: "Gagal", description: "Gagal memutuskan koneksi." });
+    } catch (error: any) {
+        toast({ variant: "destructive", title: "Gagal", description: error.message || "Gagal memutuskan koneksi." });
     } finally {
         setIsProcessing(false);
     }

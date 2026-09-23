@@ -1,13 +1,11 @@
-
 'use server';
 
-import { doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
-import { firestore } from '@/firebase/server';
+import { adminDb } from '@/firebase/admin';
 import { sendVerificationCodeEmail } from '@/lib/email';
 import bcrypt from 'bcryptjs';
 
 /**
- * Generates a 6-digit code, stores its hash in Firestore, and sends the plain code via email.
+ * Generates a 6-digit code, stores its hash in Firestore via Admin SDK, and sends the plain code via email.
  */
 export async function sendVerificationCode(email: string): Promise<{ success: boolean; message: string }> {
     if (!email) {
@@ -20,8 +18,8 @@ export async function sendVerificationCode(email: string): Promise<{ success: bo
         const codeHash = await bcrypt.hash(code, salt);
         const expires = new Date(new Date().getTime() + 10 * 60 * 1000); // 10 minutes expiry
 
-        const verificationRef = doc(firestore, 'verificationCodes', email);
-        await setDoc(verificationRef, {
+        const verificationRef = adminDb.collection('verificationCodes').doc(email);
+        await verificationRef.set({
             email,
             codeHash,
             expires: expires.toISOString(),
@@ -37,7 +35,7 @@ export async function sendVerificationCode(email: string): Promise<{ success: bo
 }
 
 /**
- * Verifies the provided code against the stored hash in Firestore.
+ * Verifies the provided code against the stored hash in Firestore via Admin SDK.
  */
 export async function verifyCode(email: string, code: string): Promise<{ success: boolean; message: string }> {
     if (!email || !code) {
@@ -45,16 +43,16 @@ export async function verifyCode(email: string, code: string): Promise<{ success
     }
     
     try {
-        const verificationRef = doc(firestore, 'verificationCodes', email);
-        const docSnap = await getDoc(verificationRef);
+        const verificationRef = adminDb.collection('verificationCodes').doc(email);
+        const docSnap = await verificationRef.get();
 
-        if (!docSnap.exists()) {
+        if (!docSnap.exists) {
             return { success: false, message: 'Invalid or expired verification code.' };
         }
 
         const data = docSnap.data();
-        if (new Date(data.expires) < new Date()) {
-            await deleteDoc(verificationRef);
+        if (!data || new Date(data.expires) < new Date()) {
+            await verificationRef.delete();
             return { success: false, message: 'Verification code has expired. Please try again.' };
         }
 
@@ -72,13 +70,13 @@ export async function verifyCode(email: string, code: string): Promise<{ success
 }
 
 /**
- * Deletes the verification code from Firestore after successful user creation.
+ * Deletes the verification code from Firestore after successful user creation via Admin SDK.
  */
 export async function deleteVerificationCode(email: string): Promise<void> {
     if (!email) return;
     try {
-        const verificationRef = doc(firestore, 'verificationCodes', email);
-        await deleteDoc(verificationRef);
+        const verificationRef = adminDb.collection('verificationCodes').doc(email);
+        await verificationRef.delete();
     } catch (error) {
         console.error("Failed to delete verification code:", error);
     }
