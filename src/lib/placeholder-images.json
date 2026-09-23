@@ -1,0 +1,58 @@
+{
+  "placeholderImages": [
+    {
+      "id": "user-avatar-1",
+      "description": "User avatar",
+      "imageUrl": "https://picsum.photos/seed/101/40/40",
+      "imageHint": "person portrait"
+    },
+    {
+      "id": "qris-code-placeholder",
+      "description": "Placeholder for QRIS code",
+      "imageUrl": "https://picsum.photos/seed/102/256/256",
+      "imageHint": "qr code"
+    },
+    {
+      "id": "recent-sales-1",
+      "description": "Recent sales user avatar 1",
+      "imageUrl": "https://picsum.photos/seed/1/40/40",
+      "imageHint": "person portrait"
+    },
+    {
+      "id": "recent-sales-2",
+      "description": "Recent sales user avatar 2",
+      "imageUrl": "https://picsum.photos/seed/2/40/40",
+      "imageHint": "person portrait"
+    },
+    {
+      "id": "recent-sales-3",
+      "description": "Recent sales user avatar 3",
+      "imageUrl": "https://picsum.photos/seed/3/40/40",
+      "imageHint": "person portrait"
+    },
+    {
+      "id": "recent-sales-4",
+      "description": "Recent sales user avatar 4",
+      "imageUrl": "https://picsum.photos/seed/4/40/40",
+      "imageHint": "person portrait"
+    },
+    {
+      "id": "recent-sales-5",
+      "description": "Recent sales user avatar 5",
+      "imageUrl": "https://picsum.photos/seed/5/40/40",
+      "imageHint": "person portrait"
+    },
+    {
+      "id": "landing-hero-1",
+      "description": "Landing page hero image",
+      "imageUrl": "/img/banner.png",
+      "imageHint": "dashboard mockup"
+    },
+    {
+      "id": "testimonial-avatar-1",
+      "description": "Testimonial user avatar",
+      "imageUrl": "https://picsum.photos/seed/301/64/64",
+      "imageHint": "woman portrait"
+    }
+  ]
+}

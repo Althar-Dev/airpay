@@ -1,0 +1,43 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Izin membaca dan menulis ke semua dokumen (termasuk list collection & collectionGroup)
+    match /{document=**} {
+      allow read, write: if true;
+    }
+
+    // merchants collection & subcollections
+    match /merchants/{userId} {
+      allow read, write: if true;
+
+      match /transactions/{transactionId} {
+        allow read, write: if true;
+      }
+
+      match /{allSubcollections=**} {
+        allow read, write: if true;
+      }
+    }
+
+    // Collection Group query untuk transactions (collectionGroup('transactions'))
+    match /{path=**}/transactions/{transactionId} {
+      allow read, write: if true;
+    }
+
+    // Collection Group query untuk apiKeys
+    match /{path=**}/apiKeys/{keyId} {
+      allow read, write: if true;
+    }
+
+    // Pengaturan sistem & payment channel config
+    match /system/{settingId} {
+      allow read, write: if true;
+    }
+
+    // Verifikasi OTP
+    match /verificationCodes/{email} {
+      allow read, write: if true;
+    }
+  }
+}
