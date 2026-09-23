@@ -124,60 +124,9 @@ export async function POST(req: Request) {
       updatedAt: now.toISOString()
     });
 
-    // 8. Eksekusi Otomatis H2H Payout via Channel Orderkuota (jika aktif)
-    let finalStatus: 'Pending' | 'Success' | 'Failed' = 'Pending';
-    let h2hMessage = '';
-
-    try {
-      const { executeOrderkuotaPayout } = await import('@/lib/payment/orderkuota-payout');
-      const payoutRes = await executeOrderkuotaPayout({
-        refId: txId,
-        bankName: merchantData.bankName,
-        bankNameId: merchantData.bankNameId,
-        accountNumber: merchantData.bankAccountNumber,
-        qtyAmount: amount
-      });
-
-      finalStatus = payoutRes.status;
-      h2hMessage = payoutRes.message;
-
-      if (payoutRes.status === 'Success' || payoutRes.success) {
-        finalStatus = 'Success';
-        await updateDoc(newTxDoc, {
-          status: 'Success',
-          h2hMessage: payoutRes.message,
-          updatedAt: new Date().toISOString()
-        });
-      } else if (payoutRes.status === 'Failed') {
-        await updateDoc(newTxDoc, {
-          status: 'Failed',
-          rejectionReason: payoutRes.message,
-          h2hMessage: payoutRes.message,
-          updatedAt: new Date().toISOString()
-        });
-
-        // Refund Saldo Merchant jika H2H Orderkuota Gagal
-        await updateDoc(merchantRef, {
-          balance: increment(totalDeducted),
-          updatedAt: new Date().toISOString()
-        });
-      } else if (payoutRes.message) {
-        await updateDoc(newTxDoc, {
-          h2hMessage: payoutRes.message,
-          updatedAt: new Date().toISOString()
-        });
-      }
-    } catch (h2hErr: any) {
-      console.error('[Orderkuota Auto-Payout Error]:', h2hErr);
-    }
-
     return NextResponse.json({
       status: true,
-      message: finalStatus === 'Success' 
-        ? 'Penarikan saldo berhasil diproses & dikirim via Orderkuota H2H'
-        : (finalStatus === 'Failed' 
-            ? 'Pengajuan penarikan gagal & saldo telah di-refund otomatis' 
-            : 'Pengajuan penarikan saldo berhasil dikirim (Status: Pending Orderkuota H2H)'),
+      message: 'Pengajuan penarikan saldo berhasil dikirim (Status: Pending)',
       data: {
         transaction_id: txId,
         withdraw_amount: amount,
@@ -187,8 +136,7 @@ export async function POST(req: Request) {
         bank_name: merchantData.bankName,
         account_number: merchantData.bankAccountNumber,
         account_name: merchantData.bankAccountName || merchantData.name,
-        status: finalStatus,
-        h2h_response: h2hMessage,
+        status: 'Pending',
         created_at: now.toISOString()
       }
     });

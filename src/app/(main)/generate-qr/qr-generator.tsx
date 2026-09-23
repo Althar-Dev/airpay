@@ -153,12 +153,11 @@ export function QrGenerator() {
     try {
       const payments = settings.payments || {};
       let qrisBase = '';
-      if (payments.orderkuota?.enabled) qrisBase = payments.orderkuota.qrisString;
-      else if (payments.gopay?.enabled) qrisBase = payments.gopay.qrisString;
-      else if (payments.shopeepay?.enabled) qrisBase = payments.shopeepay.qrisString;
+      if (payments.gopay?.enabled) qrisBase = payments.gopay.qrisString;
+      else if (payments.gopay?.qrisString) qrisBase = payments.gopay.qrisString;
 
       if (!qrisBase) {
-        toast({ variant: "destructive", title: "Channel Tidak Aktif", description: "Admin belum mengaktifkan saluran pembayaran (Orderkuota/Gopay/Shopee)." });
+        toast({ variant: "destructive", title: "Channel Tidak Aktif", description: "Admin belum mengaktifkan saluran pembayaran Gopay." });
         setIsGenerating(false);
         return;
       }

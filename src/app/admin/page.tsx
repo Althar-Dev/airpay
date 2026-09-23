@@ -77,9 +77,7 @@ export default function AdminDashboardPage() {
 
   // Payment Channels Active Status
   const paymentsConfig = settingsData?.payments || {};
-  const isOrderkuotaActive = !!(paymentsConfig.orderkuota?.username && paymentsConfig.orderkuota?.token);
   const isGoPayActive = !!(paymentsConfig.gopay?.accessToken && paymentsConfig.gopay?.merchantId);
-  const isShopeePayActive = !!(paymentsConfig.shopeepay?.token);
 
   return (
     <div className="flex flex-col gap-6 sm:gap-8 pb-32">
@@ -204,23 +202,6 @@ export default function AdminDashboardPage() {
 
               <div className="flex items-center justify-between p-4 hover:bg-[#FFFDF5] dark:hover:bg-zinc-800/60 transition-colors">
                 <div className="flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-xl bg-neo-yellow border-2 border-black shadow-neo-sm flex items-center justify-center text-black shrink-0">
-                    <Zap className="h-4.5 w-4.5 stroke-[2.5]" />
-                  </div>
-                  <div>
-                    <p className="font-headline font-black text-xs sm:text-sm text-black dark:text-white">Orderkuota Payment Gateway</p>
-                    <p className="text-[10px] font-bold text-black/60 dark:text-zinc-400">Mutasi QRIS Orderkuota Integration</p>
-                  </div>
-                </div>
-                {isOrderkuotaActive ? (
-                  <span className="bg-neo-green text-black border-2 border-black shadow-neo-sm text-[10px] font-headline font-black px-2.5 py-0.5 rounded-lg">Terhubung & Aktif ⚡</span>
-                ) : (
-                  <span className="bg-neo-coral text-white border-2 border-black shadow-neo-sm text-[10px] font-headline font-black px-2.5 py-0.5 rounded-lg">Belum Dikonfigurasi</span>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between p-4 hover:bg-[#FFFDF5] dark:hover:bg-zinc-800/60 transition-colors">
-                <div className="flex items-center gap-3">
                   <div className="h-9 w-9 rounded-xl bg-neo-mint border-2 border-black shadow-neo-sm flex items-center justify-center text-black shrink-0">
                     <Server className="h-4.5 w-4.5 stroke-[2.5]" />
                   </div>
@@ -230,23 +211,6 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
                 {isGoPayActive ? (
-                  <span className="bg-neo-green text-black border-2 border-black shadow-neo-sm text-[10px] font-headline font-black px-2.5 py-0.5 rounded-lg">Terhubung & Aktif ⚡</span>
-                ) : (
-                  <span className="bg-neo-coral text-white border-2 border-black shadow-neo-sm text-[10px] font-headline font-black px-2.5 py-0.5 rounded-lg">Belum Dikonfigurasi</span>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between p-4 hover:bg-[#FFFDF5] dark:hover:bg-zinc-800/60 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-xl bg-neo-coral text-white border-2 border-black shadow-neo-sm flex items-center justify-center shrink-0">
-                    <CreditCard className="h-4.5 w-4.5 stroke-[2.5]" />
-                  </div>
-                  <div>
-                    <p className="font-headline font-black text-xs sm:text-sm text-black dark:text-white">ShopeePay Merchant Gateway</p>
-                    <p className="text-[10px] font-bold text-black/60 dark:text-zinc-400">Mutasi QRIS ShopeePay Bridge API</p>
-                  </div>
-                </div>
-                {isShopeePayActive ? (
                   <span className="bg-neo-green text-black border-2 border-black shadow-neo-sm text-[10px] font-headline font-black px-2.5 py-0.5 rounded-lg">Terhubung & Aktif ⚡</span>
                 ) : (
                   <span className="bg-neo-coral text-white border-2 border-black shadow-neo-sm text-[10px] font-headline font-black px-2.5 py-0.5 rounded-lg">Belum Dikonfigurasi</span>

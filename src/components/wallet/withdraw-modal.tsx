@@ -100,55 +100,10 @@ export function WithdrawModal({ isOpen, onClose, onOpenBankModal }: WithdrawModa
         updatedAt: now.toISOString()
       });
 
-      // 3. Eksekusi Otomatis H2H Payout Orderkuota via Server Action (Node.js - Bypass CORS)
-      try {
-        const { processOrderkuotaPayoutAction } = await import('@/lib/actions/orderkuota-payout-action');
-        const payoutRes = await processOrderkuotaPayoutAction({
-          refId: txId,
-          bankName: merchantData.bankName,
-          bankNameId: merchantData.bankNameId,
-          accountNumber: merchantData.bankAccountNumber,
-          qtyAmount: numAmount
-        });
-
-        if (payoutRes.status === 'Success' || payoutRes.success) {
-          updateDocumentNonBlocking(newTxDoc, {
-            status: 'Success',
-            h2hMessage: payoutRes.message,
-            updatedAt: new Date().toISOString()
-          });
-
-          toast({
-            title: "Penarikan Saldo Berhasil Diproses! 🟢",
-            description: `Dana ${formatIDR(numAmount)} telah berhasil dikirim otomatis via Orderkuota H2H ke ${merchantData.bankName} (${merchantData.bankAccountNumber}).`,
-          });
-        } else if (payoutRes.status === 'Failed') {
-          updateDocumentNonBlocking(newTxDoc, {
-            status: 'Failed',
-            rejectionReason: payoutRes.message,
-            h2hMessage: payoutRes.message,
-            updatedAt: new Date().toISOString()
-          });
-
-          // Refund saldo jika H2H Orderkuota Gagal
-          updateDocumentNonBlocking(merchantRef, {
-            balance: increment(totalDeducted),
-            updatedAt: new Date().toISOString()
-          });
-
-          toast({
-            variant: "destructive",
-            title: "Penarikan Gagal & Saldo Di-refund 🔴",
-            description: `Gagal mengirim ke Orderkuota: ${payoutRes.message}. Saldo telah dikembalikan.`,
-          });
-        }
-      } catch (err: any) {
-        console.error('Orderkuota client trigger error:', err);
-        toast({
-          title: "Pengajuan Penarikan Saldo Dikirim! ⌛",
-          description: `Penarikan ${formatIDR(numAmount)} ke ${merchantData.bankName} diajukan (Status: Pending). Admin akan segera mengonfirmasi transfer.`,
-        });
-      }
+      toast({
+        title: "Pengajuan Penarikan Saldo Dikirim! ⌛",
+        description: `Penarikan ${formatIDR(numAmount)} ke ${merchantData.bankName} diajukan (Status: Pending). Admin akan segera mengonfirmasi transfer.`,
+      });
 
       setWithdrawAmount('');
       onClose();

@@ -91,9 +91,8 @@ export default function TransactionDetailPage({ params }: { params: Promise<{ id
         const payments = settings?.payments || {};
         let qrisBase = txData.qrisString || '';
         if (!qrisBase) {
-          if (payments.orderkuota?.enabled) qrisBase = payments.orderkuota.qrisString;
-          else if (payments.gopay?.enabled) qrisBase = payments.gopay.qrisString;
-          else if (payments.shopeepay?.enabled) qrisBase = payments.shopeepay.qrisString;
+          if (payments.gopay?.enabled) qrisBase = payments.gopay.qrisString;
+          else if (payments.gopay?.qrisString) qrisBase = payments.gopay.qrisString;
           if (qrisBase && txData.amount) {
             qrisBase = generateDynamicQrisString(txData.amount.toString(), qrisBase);
           }

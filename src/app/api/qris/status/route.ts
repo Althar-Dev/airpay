@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { firestore } from '@/firebase/server';
 import { doc, getDoc, updateDoc, collection, query, where, getDocs, increment } from 'firebase/firestore';
-import { getOrderkuotaMutations } from '@/lib/payment/orderkuota';
 import { goBizMutations } from '@/lib/payment/gopay';
-import { getShopeeMutations } from '@/lib/payment/shopeepay';
 
 /**
  * Helper serbaguna untuk memproses nominal angka Rupiah Indonesia/API.
@@ -165,29 +163,7 @@ async function handleCheckStatusLogic(merchantId: string, targetId: string) {
     const minValidTime = trxCreatedTime - 60000;
 
     // 5. Cek Mutasi di Payment Channel yang Memiliki Token Kredensial Valid
-    // A. Orderkuota Channel
-    if (payments.orderkuota?.username && payments.orderkuota?.token) {
-        try {
-            const res = await getOrderkuotaMutations(payments.orderkuota.username, payments.orderkuota.token);
-            if (res.status && Array.isArray(res.result)) {
-                for (const item of res.result) {
-                    const itemAmount = parseIndonesianNumber(item.kredit);
-                    const itemTime = item.tanggal ? new Date(item.tanggal.replace(' ', 'T')).getTime() : null;
-                    const isTimeValid = !itemTime || isNaN(itemTime) || itemTime >= minValidTime;
-
-                    if (item.status === 'IN' && Math.abs(itemAmount - targetAmount) < 1 && isTimeValid) {
-                        isMatched = true;
-                        if (item.tanggal) paidAtTime = item.tanggal;
-                        break;
-                    }
-                }
-            }
-        } catch (err) {
-            console.error('Error checking Orderkuota mutations:', err);
-        }
-    }
-
-    // B. GoPay / GoBiz Channel
+    // GoPay / GoBiz Channel
     if (!isMatched && payments.gopay?.accessToken && payments.gopay?.merchantId) {
         try {
             const res = await goBizMutations({
@@ -213,29 +189,6 @@ async function handleCheckStatusLogic(merchantId: string, targetId: string) {
             }
         } catch (err) {
             console.error('Error checking GoPay mutations:', err);
-        }
-    }
-
-    // C. ShopeePay Channel
-    if (!isMatched && payments.shopeepay?.token) {
-        try {
-            const res = await getShopeeMutations(payments.shopeepay.token, 30);
-            if (res.success && Array.isArray(res.data)) {
-                for (const item of res.data) {
-                    const itemAmount = parseIndonesianNumber(item.amount);
-                    const itemTime = item.created_at ? new Date(item.created_at).getTime() : null;
-                    const isTimeValid = !itemTime || isNaN(itemTime) || itemTime >= minValidTime;
-                    const isSuccess = item.status === 'SUCCESS' || item.status_code === 3 || item.direction === 'IN' || item.type === 'CR';
-
-                    if (isSuccess && Math.abs(itemAmount - targetAmount) < 1 && isTimeValid) {
-                        isMatched = true;
-                        if (item.created_at) paidAtTime = item.created_at;
-                        break;
-                    }
-                }
-            }
-        } catch (err) {
-            console.error('Error checking ShopeePay mutations:', err);
         }
     }
 

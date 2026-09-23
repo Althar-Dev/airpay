@@ -2,9 +2,7 @@
 
 import { firestore } from '@/firebase/server';
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, increment } from 'firebase/firestore';
-import { getOrderkuotaMutations } from '@/lib/payment/orderkuota';
 import { goBizMutations } from '@/lib/payment/gopay';
-import { getShopeeMutations } from '@/lib/payment/shopeepay';
 import { parseIndonesianNumber } from '@/app/api/qris/status/route';
 
 /**
@@ -28,19 +26,7 @@ export async function reconcileMerchantPendingTransactions(merchantId: string) {
         const payments = settings.payments || {};
         const mdrFeePercent = typeof settings.mdrFee === 'number' ? settings.mdrFee : 0.7;
 
-        let orderkuotaMutations: any[] = [];
         let gopayMutations: any[] = [];
-        let shopeeMutations: any[] = [];
-
-        // Tarik Mutasi Orderkuota jika token ada
-        if (payments.orderkuota?.username && payments.orderkuota?.token) {
-            try {
-                const res = await getOrderkuotaMutations(payments.orderkuota.username, payments.orderkuota.token);
-                if (res.status && Array.isArray(res.result)) {
-                    orderkuotaMutations = res.result;
-                }
-            } catch (e) { }
-        }
 
         // Tarik Mutasi GoPay jika token ada
         if (payments.gopay?.accessToken && payments.gopay?.merchantId) {
@@ -55,16 +41,6 @@ export async function reconcileMerchantPendingTransactions(merchantId: string) {
                 });
                 if (res.status === 'success' && Array.isArray(res.data?.mutations)) {
                     gopayMutations = res.data.mutations;
-                }
-            } catch (e) { }
-        }
-
-        // Tarik Mutasi ShopeePay jika token ada
-        if (payments.shopeepay?.token) {
-            try {
-                const res = await getShopeeMutations(payments.shopeepay.token, 30);
-                if (res.success && Array.isArray(res.data)) {
-                    shopeeMutations = res.data;
                 }
             } catch (e) { }
         }
@@ -92,47 +68,16 @@ export async function reconcileMerchantPendingTransactions(merchantId: string) {
             let isPaid = false;
             let paidTime = now.toISOString();
 
-            // 2. Cek Match Orderkuota
-            for (const m of orderkuotaMutations) {
-                const itemAmount = parseIndonesianNumber(m.kredit);
-                const itemTime = m.tanggal ? new Date(m.tanggal.replace(' ', 'T')).getTime() : null;
+            // Cek Match GoPay
+            for (const m of gopayMutations) {
+                const itemAmount = parseIndonesianNumber(m.amount);
+                const itemTime = m.timestamp ? new Date(m.timestamp).getTime() : null;
                 const isTimeValid = !itemTime || isNaN(itemTime) || itemTime >= minValidTime;
 
-                if (m.status === 'IN' && Math.abs(itemAmount - targetAmount) < 1 && isTimeValid) {
+                if (m.type === 'IN' && Math.abs(itemAmount - targetAmount) < 1 && isTimeValid) {
                     isPaid = true;
-                    if (m.tanggal) paidTime = m.tanggal;
+                    if (m.timestamp) paidTime = m.timestamp;
                     break;
-                }
-            }
-
-            // 3. Cek Match GoPay
-            if (!isPaid) {
-                for (const m of gopayMutations) {
-                    const itemAmount = parseIndonesianNumber(m.amount);
-                    const itemTime = m.timestamp ? new Date(m.timestamp).getTime() : null;
-                    const isTimeValid = !itemTime || isNaN(itemTime) || itemTime >= minValidTime;
-
-                    if (m.type === 'IN' && Math.abs(itemAmount - targetAmount) < 1 && isTimeValid) {
-                        isPaid = true;
-                        if (m.timestamp) paidTime = m.timestamp;
-                        break;
-                    }
-                }
-            }
-
-            // 4. Cek Match ShopeePay
-            if (!isPaid) {
-                for (const m of shopeeMutations) {
-                    const itemAmount = parseIndonesianNumber(m.amount);
-                    const itemTime = m.created_at ? new Date(m.created_at).getTime() : null;
-                    const isTimeValid = !itemTime || isNaN(itemTime) || itemTime >= minValidTime;
-                    const isSuccess = m.status === 'SUCCESS' || m.status_code === 3 || m.direction === 'IN' || m.type === 'CR';
-
-                    if (isSuccess && Math.abs(itemAmount - targetAmount) < 1 && isTimeValid) {
-                        isPaid = true;
-                        if (m.created_at) paidTime = m.created_at;
-                        break;
-                    }
                 }
             }
 
