@@ -8,15 +8,14 @@ function initializeServerFirebase() {
     }
     
     try {
-      // Attempt to initialize via Firebase App Hosting environment variables
-      return initializeApp();
-    } catch (e) {
-      if (process.env.NODE_ENV === "production") {
-        console.warn('Automatic server-side initialization failed. Falling back to firebase config object.', e);
+      if (process.env.FIREBASE_CONFIG || process.env.K_SERVICE) {
+        return initializeApp();
       }
-      // Fallback to config for local development or other environments
-      return initializeApp(firebaseConfig);
+    } catch (e) {
+      // Ignore and fallback
     }
+
+    return initializeApp(firebaseConfig);
 }
 
 const firebaseApp = initializeServerFirebase();
