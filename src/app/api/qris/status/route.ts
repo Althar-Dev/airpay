@@ -13,10 +13,9 @@ export function parseIndonesianNumber(val: any): number {
 
     // Jika input bertipe JS number (seperti 1.061, 1.099, 1.000=1 dari JSON deserializer)
     if (typeof val === 'number') {
+        if (isNaN(val)) return 0;
+        if (Number.isInteger(val)) return val;
         if (val > 0 && val < 10) {
-            if (Number.isInteger(val)) {
-                return val * 1000; // 1 -> 1000 (dari 1.000)
-            }
             const strFloat = val.toFixed(3);
             return parseInt(strFloat.replace('.', ''), 10);
         }
@@ -35,15 +34,22 @@ export function parseIndonesianNumber(val: any): number {
         str = str.split(',')[0];
     }
 
-    // Jika string berisi desimal berformat titik "1.061", "1.099", "5.170", "1.000"
+    // Jika string berisi desimal berformat titik "1.061", "1.099", "5.170", "1.000", "137.00"
     if (str.includes('.')) {
         const parts = str.split('.');
-        if (parts.length === 2 && parts[0].length < 4) {
-            let decimalPart = parts[1];
-            if (decimalPart.length === 1) decimalPart += '00';
-            else if (decimalPart.length === 2) decimalPart += '0';
-            str = parts[0] + decimalPart;
+        if (parts.length === 2) {
+            const [intPart, decPart] = parts;
+            // Desimal sen standar seperti "137.00", "500.00", "50034.00", "137.0"
+            if (decPart === '00' || decPart === '0' || intPart.length > 3) {
+                str = intPart;
+            } else if (intPart.length <= 3 && decPart.length === 3) {
+                // Ribuan format Indonesia seperti "1.061" -> "1061"
+                str = intPart + decPart;
+            } else {
+                str = intPart;
+            }
         } else {
+            // Lebih dari 1 titik (misal "1.000.000") -> hapus semua titik
             str = str.replace(/\./g, '');
         }
     }
@@ -158,7 +164,7 @@ async function handleCheckStatusLogic(merchantId: string, targetId: string) {
     let isMatched = false;
     let paidAtTime = now.toISOString();
 
-    // Ambil timestamp pembuatan transaksi (Wajib: Mutasi harus terjadi SETELAH/SAAT transaksi dibuat)
+    // Ambil timestamp pembuatan transaksi
     const trxCreatedTime = new Date(trxData.transactionDate || trxData.createdAt || trxData.updatedAt || Date.now()).getTime();
     const minValidTime = trxCreatedTime - 60000;
 
@@ -174,15 +180,35 @@ async function handleCheckStatusLogic(merchantId: string, targetId: string) {
                 merchantId: payments.gopay.merchantId,
                 limit: 30
             });
+
             if (res.status === 'success' && Array.isArray(res.data?.mutations)) {
+                console.log(`[STATUS CHECK] Target: Rp ${targetAmount} (${trxData.id}), Mutations fetched: ${res.data.mutations.length}`);
                 for (const item of res.data.mutations) {
                     const itemAmount = parseIndonesianNumber(item.amount);
-                    const itemTime = item.timestamp ? new Date(item.timestamp).getTime() : null;
-                    const isTimeValid = !itemTime || isNaN(itemTime) || itemTime >= minValidTime;
 
-                    if (item.type === 'IN' && Math.abs(itemAmount - targetAmount) < 1 && isTimeValid) {
+                    const typeStr = String(item.type || 'IN').toUpperCase();
+                    const isIncoming = ['IN', 'CR', 'KREDIT', 'CREDIT'].includes(typeStr) || !['OUT', 'DB', 'DEBIT'].includes(typeStr);
+
+                    const statusStr = String(item.status || 'paid').toLowerCase();
+                    const isStatusOk = ['paid', 'success', 'successful', 'settlement', 'completed', 'ok'].includes(statusStr);
+
+                    const rawTime = item.timestamp || item.created_at || item.transaction_time || item.date || item.time;
+                    let itemTime: number | null = null;
+                    if (rawTime) {
+                        if (typeof rawTime === 'number') {
+                            itemTime = rawTime < 1e11 ? rawTime * 1000 : rawTime;
+                        } else {
+                            const parsedDate = new Date(rawTime).getTime();
+                            if (!isNaN(parsedDate)) itemTime = parsedDate;
+                        }
+                    }
+
+                    const isTimeValid = !itemTime || isNaN(itemTime) || itemTime >= (minValidTime - 86400000);
+
+                    if (isIncoming && isStatusOk && Math.abs(itemAmount - targetAmount) < 1 && isTimeValid) {
                         isMatched = true;
-                        if (item.timestamp) paidAtTime = item.timestamp;
+                        if (rawTime) paidAtTime = typeof rawTime === 'string' ? rawTime : new Date(itemTime!).toISOString();
+                        console.log(`[MATCH FOUND] Trx ${trxData.id} matched with mutation amount: ${itemAmount}`);
                         break;
                     }
                 }

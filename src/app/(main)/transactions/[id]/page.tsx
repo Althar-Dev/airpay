@@ -125,7 +125,7 @@ export default function TransactionDetailPage({ params }: { params: Promise<{ id
         const blob = await qrCode.getRawData('png');
         if (blob && isMounted) {
           const reader = new FileReader();
-          reader.readAsDataURL(blob);
+          reader.readAsDataURL(blob as Blob);
           reader.onloadend = () => {
             if (isMounted) setQrImage(reader.result as string);
           };

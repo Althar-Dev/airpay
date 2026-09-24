@@ -71,12 +71,29 @@ export async function reconcileMerchantPendingTransactions(merchantId: string) {
             // Cek Match GoPay
             for (const m of gopayMutations) {
                 const itemAmount = parseIndonesianNumber(m.amount);
-                const itemTime = m.timestamp ? new Date(m.timestamp).getTime() : null;
-                const isTimeValid = !itemTime || isNaN(itemTime) || itemTime >= minValidTime;
+                
+                const typeStr = String(m.type || 'IN').toUpperCase();
+                const isIncoming = ['IN', 'CR', 'KREDIT', 'CREDIT'].includes(typeStr) || !['OUT', 'DB', 'DEBIT'].includes(typeStr);
 
-                if (m.type === 'IN' && Math.abs(itemAmount - targetAmount) < 1 && isTimeValid) {
+                const statusStr = String(m.status || 'paid').toLowerCase();
+                const isStatusOk = ['paid', 'success', 'successful', 'settlement', 'completed', 'ok'].includes(statusStr);
+
+                const rawTime = m.timestamp || m.created_at || m.transaction_time || m.date || m.time;
+                let itemTime: number | null = null;
+                if (rawTime) {
+                    if (typeof rawTime === 'number') {
+                        itemTime = rawTime < 1e11 ? rawTime * 1000 : rawTime;
+                    } else {
+                        const parsedDate = new Date(rawTime).getTime();
+                        if (!isNaN(parsedDate)) itemTime = parsedDate;
+                    }
+                }
+
+                const isTimeValid = !itemTime || isNaN(itemTime) || itemTime >= (minValidTime - 86400000);
+
+                if (isIncoming && isStatusOk && Math.abs(itemAmount - targetAmount) < 1 && isTimeValid) {
                     isPaid = true;
-                    if (m.timestamp) paidTime = m.timestamp;
+                    if (rawTime) paidTime = typeof rawTime === 'string' ? rawTime : new Date(itemTime!).toISOString();
                     break;
                 }
             }

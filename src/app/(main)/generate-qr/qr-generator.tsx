@@ -216,7 +216,7 @@ export function QrGenerator() {
       if (!blob) throw new Error("Gagal mengolah data gambar QR.");
 
       const reader = new FileReader();
-      reader.readAsDataURL(blob);
+      reader.readAsDataURL(blob as Blob);
       reader.onloadend = async () => {
         const base64data = reader.result as string;
 
