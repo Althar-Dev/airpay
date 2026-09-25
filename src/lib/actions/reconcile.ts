@@ -67,6 +67,7 @@ export async function reconcileMerchantPendingTransactions(merchantId: string) {
 
             let isPaid = false;
             let paidTime = now.toISOString();
+            let matchedMutationId = '';
 
             // Cek Match GoPay
             for (const m of gopayMutations) {
@@ -89,10 +90,31 @@ export async function reconcileMerchantPendingTransactions(merchantId: string) {
                     }
                 }
 
-                const isTimeValid = !itemTime || isNaN(itemTime) || itemTime >= (minValidTime - 86400000);
+                // Strict timestamp validation: Mutasi HARUS terjadi SETELAH transaksi dibuat
+                const isTimeValid = !itemTime || isNaN(itemTime) || itemTime >= minValidTime;
 
-                if (isIncoming && isStatusOk && Math.abs(itemAmount - targetAmount) < 1 && isTimeValid) {
+                const mutationId = m.id || m.trx_id || m.reference_id || m.transaction_id || '';
+                let isAlreadyClaimed = false;
+
+                if (mutationId) {
+                    try {
+                        const usedQuery = query(
+                            collection(firestore, 'merchants', merchantId, 'transactions'),
+                            where('matchedMutationId', '==', String(mutationId))
+                        );
+                        const usedSnap = await getDocs(usedQuery);
+                        if (!usedSnap.empty) {
+                            const claimedTrxId = usedSnap.docs[0].id;
+                            if (claimedTrxId !== trx.id) {
+                                isAlreadyClaimed = true;
+                            }
+                        }
+                    } catch (e) { }
+                }
+
+                if (isIncoming && isStatusOk && Math.abs(itemAmount - targetAmount) < 1 && isTimeValid && !isAlreadyClaimed) {
                     isPaid = true;
+                    matchedMutationId = String(mutationId);
                     if (rawTime) paidTime = typeof rawTime === 'string' ? rawTime : new Date(itemTime!).toISOString();
                     break;
                 }
@@ -110,6 +132,7 @@ export async function reconcileMerchantPendingTransactions(merchantId: string) {
                         netAmount: netAmount,
                         mdrRate: mdrFeePercent,
                         paidAt: paidTime,
+                        matchedMutationId: matchedMutationId || null,
                         updatedAt: now.toISOString()
                     });
 

@@ -136,13 +136,34 @@ export default function GopayConfigPage() {
                     'payments.gopay.refreshToken': res.data.refresh_token || ''
                 });
             }
+        } else {
+            setMutations([]);
+            if (res.message) {
+                const isRateLimit = res.message.includes('429') || res.message.toLowerCase().includes('too many requests');
+                toast({
+                    variant: "destructive",
+                    title: isRateLimit ? "Batas Pemanggilan Terlampaui (Rate Limit)" : "Gagal Mengambil Mutasi GoBiz",
+                    description: isRateLimit 
+                        ? "Server GoBiz membatasi pemanggilan (HTTP 429) akibat terlalu banyak request berturut-turut. Mohon tunggu sekitar 1-2 menit sebelum menekan Refresh lagi."
+                        : res.message
+                });
+            }
         }
-    } catch (error) {
+    } catch (error: any) {
         console.error("Failed to fetch mutations:", error);
+        setMutations([]);
+        const isRateLimit = String(error?.message).includes('429') || String(error?.message).toLowerCase().includes('too many requests');
+        toast({
+            variant: "destructive",
+            title: isRateLimit ? "Batas Pemanggilan Terlampaui (Rate Limit)" : "Gagal Mengambil Mutasi",
+            description: isRateLimit 
+                ? "Server GoBiz membatasi pemanggilan (HTTP 429) akibat terlalu banyak request berturut-turut. Mohon tunggu sekitar 1-2 menit sebelum menekan Refresh lagi."
+                : error.message || "Terjadi kesalahan saat terhubung ke server GoBiz."
+        });
     } finally {
         setIsFetchingMutations(false);
     }
-  }, [isConnected, settings, settingsRef]);
+  }, [isConnected, activeSettings, toast]);
 
   useEffect(() => {
     if (isConnected && mutations === null) {

@@ -163,9 +163,11 @@ async function handleCheckStatusLogic(merchantId: string, targetId: string) {
 
     let isMatched = false;
     let paidAtTime = now.toISOString();
+    let matchedMutationId = '';
 
-    // Ambil timestamp pembuatan transaksi
+    // Ambil timestamp pembuatan transaksi (Wajib: Mutasi harus terjadi SETELAH/SAAT transaksi dibuat)
     const trxCreatedTime = new Date(trxData.transactionDate || trxData.createdAt || trxData.updatedAt || Date.now()).getTime();
+    // Berikan toleransi maksimal 60 detik buffer untuk perbedaan clock jam server
     const minValidTime = trxCreatedTime - 60000;
 
     // 5. Cek Mutasi di Payment Channel yang Memiliki Token Kredensial Valid
@@ -182,7 +184,8 @@ async function handleCheckStatusLogic(merchantId: string, targetId: string) {
             });
 
             if (res.status === 'success' && Array.isArray(res.data?.mutations)) {
-                console.log(`[STATUS CHECK] Target: Rp ${targetAmount} (${trxData.id}), Mutations fetched: ${res.data.mutations.length}`);
+                console.log(`[STATUS CHECK] Target: Rp ${targetAmount} (${trxData.id}), CreatedAt: ${new Date(trxCreatedTime).toISOString()}, Mutations fetched: ${res.data.mutations.length}`);
+                
                 for (const item of res.data.mutations) {
                     const itemAmount = parseIndonesianNumber(item.amount);
 
@@ -203,12 +206,35 @@ async function handleCheckStatusLogic(merchantId: string, targetId: string) {
                         }
                     }
 
-                    const isTimeValid = !itemTime || isNaN(itemTime) || itemTime >= (minValidTime - 86400000);
+                    // Strict timestamp validation: Mutasi HARUS terjadi SETELAH transaksi dibuat (minValidTime)
+                    const isTimeValid = !itemTime || isNaN(itemTime) || itemTime >= minValidTime;
 
-                    if (isIncoming && isStatusOk && Math.abs(itemAmount - targetAmount) < 1 && isTimeValid) {
+                    const mutationId = item.id || item.trx_id || item.reference_id || item.transaction_id || '';
+                    let isAlreadyClaimed = false;
+
+                    // Cek jika ID mutasi ini sudah pernah diklaim oleh transaksi lain yang sudah Lunas
+                    if (mutationId) {
+                        try {
+                            const usedQuery = query(
+                                collection(firestore, 'merchants', merchantId, 'transactions'),
+                                where('matchedMutationId', '==', String(mutationId))
+                            );
+                            const usedSnap = await getDocs(usedQuery);
+                            if (!usedSnap.empty) {
+                                const claimedTrxId = usedSnap.docs[0].id;
+                                if (claimedTrxId !== trxData.id) {
+                                    isAlreadyClaimed = true;
+                                    console.log(`[MUTATION SKIPPED] Mutation ID '${mutationId}' already claimed by transaction '${claimedTrxId}'`);
+                                }
+                            }
+                        } catch (e) { }
+                    }
+
+                    if (isIncoming && isStatusOk && Math.abs(itemAmount - targetAmount) < 1 && isTimeValid && !isAlreadyClaimed) {
                         isMatched = true;
+                        matchedMutationId = String(mutationId);
                         if (rawTime) paidAtTime = typeof rawTime === 'string' ? rawTime : new Date(itemTime!).toISOString();
-                        console.log(`[MATCH FOUND] Trx ${trxData.id} matched with mutation amount: ${itemAmount}`);
+                        console.log(`[MATCH FOUND] Trx ${trxData.id} matched with mutation amount: ${itemAmount}, Mutation ID: ${matchedMutationId}`);
                         break;
                     }
                 }
@@ -227,6 +253,7 @@ async function handleCheckStatusLogic(merchantId: string, targetId: string) {
                 netAmount: netAmount,
                 mdrRate: mdrFeePercent,
                 paidAt: paidAtTime,
+                matchedMutationId: matchedMutationId || null,
                 updatedAt: now.toISOString()
             });
 

@@ -46,7 +46,11 @@ export async function updateSystemSettingsAction(updates: Record<string, any>): 
 
     return { success: true };
   } catch (error: any) {
-    console.error('Error updating system settings via Admin SDK:', error);
+    if (error?.code === 16 || error?.message?.includes('UNAUTHENTICATED')) {
+      console.error('[Firebase Admin Error] Kredensial Service Account di admin.json tidak valid / telah dicabut di Firebase Console. Harap generate key baru.');
+    } else {
+      console.error('Error updating system settings via Admin SDK:', error);
+    }
     return { success: false, message: error.message || 'Gagal memperbarui pengaturan sistem.' };
   }
 }
@@ -63,7 +67,11 @@ export async function getSystemSettingsAction(): Promise<{ success: boolean; dat
     }
     return { success: true, data: docSnap.data() };
   } catch (error: any) {
-    console.error('Error getting system settings via Admin SDK:', error);
+    if (error?.code === 16 || error?.message?.includes('UNAUTHENTICATED')) {
+      console.error('[Firebase Admin Error] Kredensial Service Account di admin.json tidak valid / telah dicabut di Firebase Console. Harap generate key baru.');
+    } else {
+      console.error('Error getting system settings via Admin SDK:', error);
+    }
     return { success: false, error: error.message };
   }
 }
